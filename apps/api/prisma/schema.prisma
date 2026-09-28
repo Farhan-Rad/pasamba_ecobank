@@ -1,0 +1,258 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                      String          @id @default(uuid())
+  email                   String          @unique
+  passwordHash            String
+  name                    String
+  username                String          @unique
+  avatarUrl               String?
+  role                    String          @default("USER")
+  xp                      Int             @default(0)
+  level                   Int             @default(1)
+  highContrast            Boolean         @default(false)
+  createdAt               DateTime        @default(now())
+  updatedAt               DateTime        @updatedAt
+
+  wallet                  Wallet?
+  profile                 UserProfile?
+  posts                   Post[]
+  comments                Comment[]
+  likes                   Like[]
+  transactions            Transaction[]
+  deposits                Deposit[]
+  sessions                MachineSession[]
+  achievements            UserAchievement[]
+  badges                  UserBadge[]
+  sentRequests            FriendRequest[] @relation("SentRequests")
+  receivedRequests        FriendRequest[] @relation("ReceivedRequests")
+  notifications           Notification[]
+  uploads                 Upload[]
+  redemptions             Redemption[]
+  withdrawals             Withdrawal[]
+}
+
+model UserProfile {
+  id          String  @id @default(uuid())
+  userId      String  @unique
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bio         String?
+  location    String?
+  phone       String?
+  preferences String?
+}
+
+model Wallet {
+  id      String  @id @default(uuid())
+  userId  String  @unique
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  balance Int     @default(0)
+  points  Int     @default(0)
+}
+
+model Transaction {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  amount      Int
+  type        String
+  status      String   @default("COMPLETED")
+  description String?
+  referenceId String?
+  category    String?
+  metadata    String?
+  createdAt   DateTime @default(now())
+}
+
+// Permintaan pencairan saldo ke rekening BRI user. Untuk tahap prototipe,
+// pencairan masih disetujui manual oleh admin (belum transfer otomatis
+// ke BRI, karena akses API/CMS BRI resmi masih menunggu kejelasan dari
+// pihak sekolah). Saldo langsung ditahan (dikurangi) saat request dibuat,
+// supaya user tidak bisa request 2x untuk saldo yang sama.
+model Withdrawal {
+  id            String    @id @default(uuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+  amount        Int
+  bankAccount   String
+  status        String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  adminNote     String?
+  createdAt     DateTime  @default(now())
+  processedAt   DateTime?
+}
+
+model Machine {
+  id          String          @id @default(uuid())
+  name        String
+  location    String
+  status      String          @default("OFFLINE")
+  fillLevel   Int             @default(0)
+  lastActive  DateTime?
+  acceptedTypes String        @default("[]")
+  apiKey      String          @unique @default(cuid())
+  sessions    MachineSession[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+model MachineSession {
+  id          String        @id @default(uuid())
+  machineId   String
+  machine     Machine       @relation(fields: [machineId], references: [id])
+  userId      String
+  user        User          @relation(fields: [userId], references: [id])
+  weight      Float?
+  wasteType   String?
+  status      String        @default("ACTIVE")
+  totalPoints Int           @default(0)
+  createdAt   DateTime      @default(now())
+  completedAt DateTime?
+}
+
+model Deposit {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  machineId String
+  weight    Float
+  wasteType String
+  points    Int
+  images    String   @default("[]")
+  createdAt DateTime @default(now())
+}
+
+model Post {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  content   String
+  imageUrl  String?
+  badges    String    @default("[]")
+  likes     Like[]
+  comments  Comment[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  content   String
+  createdAt DateTime @default(now())
+}
+
+model Like {
+  id        String   @id @default(uuid())
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([postId, userId])
+}
+
+model Reward {
+  id          String        @id @default(uuid())
+  name        String
+  description String
+  imageUrl    String?
+  pointsCost  Int
+  stock       Int
+  rarity      String        @default("COMMON")
+  category    String
+  isActive    Boolean       @default(true)
+  redemptions Redemption[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model Redemption {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  rewardId   String
+  reward     Reward   @relation(fields: [rewardId], references: [id])
+  pointsUsed Int
+  status     String   @default("PENDING")
+  createdAt  DateTime @default(now())
+}
+
+model Achievement {
+  id          String           @id @default(uuid())
+  name        String
+  description String
+  iconUrl     String?
+  xpReward    Int
+  criteria    String
+  users       UserAchievement[]
+}
+
+model UserAchievement {
+  userId        String
+  user          User        @relation(fields: [userId], references: [id])
+  achievementId String
+  achievement   Achievement @relation(fields: [achievementId], references: [id])
+  unlockedAt    DateTime    @default(now())
+
+  @@id([userId, achievementId])
+}
+
+model Badge {
+  id          String       @id @default(uuid())
+  name        String
+  description String
+  imageUrl    String?
+  type        String       @default("ECO")
+  users       UserBadge[]
+}
+
+model UserBadge {
+  userId   String
+  user     User     @relation(fields: [userId], references: [id])
+  badgeId  String
+  badge    Badge    @relation(fields: [badgeId], references: [id])
+  earnedAt DateTime @default(now())
+
+  @@id([userId, badgeId])
+}
+
+model FriendRequest {
+  id          String   @id @default(uuid())
+  senderId    String
+  sender      User     @relation("SentRequests", fields: [senderId], references: [id])
+  receiverId  String
+  receiver    User     @relation("ReceivedRequests", fields: [receiverId], references: [id])
+  status      String   @default("PENDING")
+  createdAt   DateTime @default(now())
+}
+
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  type      String
+  title     String
+  message   String?
+  data      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model Upload {
+  id        String   @id @default(uuid())
+  url       String
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+}

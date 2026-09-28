@@ -1,0 +1,36 @@
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Dependency directories
+/vendor/
+node_modules/
+dist/
+.turbo/
+
+# Composer / PHP
+composer.phar
+.phpunit.result.cache
+*.log
+
+# OS / editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Temporary / cache files
+/tmp/
+/cache/
+*.tmp
+*.swp
+
+# Uploads and generated assets
+/uploads/
+/public/uploads/
+!public/uploads/.gitkeep
+
+# Database files
+*.sqlite
+*.sqlite3
